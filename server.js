@@ -21,6 +21,7 @@ class Arrow {
         this.sin = (coords[0].yi - coords[1].yf)/ Math.sqrt( (coords[0].xi-coords[1].xf)**2 + (coords[0].yi-coords[1].yf)**2 );
         this.cos = (coords[0].xi - coords[1].xf)/ Math.sqrt( (coords[0].xi-coords[1].xf)**2 + (coords[0].yi-coords[1].yf)**2 )
         this.size = 40;
+        this.score = 0;
 
         this.pos = {x: player.coords.x, y: player.coords.y};
         this.vel = {vx: this.uMag*this.cos, vy: this.uMag*this.sin };
@@ -42,6 +43,8 @@ class Arrow {
             && (this.pos.y > player.coords.y - (player.size/2)) && (this.pos.y < player.coords.y + (player.size/2))
         ){
             this.hit = true;
+            player.health -= 25;
+            this.score += 10;
         }
     }
 }
@@ -71,6 +74,9 @@ function update(dt){
     for(const arrow of arrows){
         for(const player of Object.values(players)){
             arrow.hits(player);
+            if(player.health <= 0){
+                delete players.player;
+            }
         }
         arrow.update(dt);
     }
