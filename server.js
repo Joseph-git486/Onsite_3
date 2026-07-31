@@ -8,11 +8,9 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-
-
-const floor = 1000;
-let arrows1 = [];
-let arrows2 = [];
+const floor = 580;
+let arrows = [];
+const players = {};
 
 class Arrow {
     constructor(player, coords,floor){    // coords = [{xi,yi},[xf,yf]]
@@ -24,14 +22,15 @@ class Arrow {
         this.cos = (coords[0].xi - coords[1].xf)/ Math.sqrt( (coords[0].xi-coords[1].xf)**2 + (coords[0].yi-coords[1].yf)**2 )
         this.size = 40;
 
-        this.pos = createVector(player.x, player.y);
-        this.vel = createVector( this.uMag*this.cos, this.uMag*this.sin );
-        this.acc = createVector(0,-10);
+        this.pos = {x: player.x, y: player.y};
+        this.vel = {vx: this.uMag*this.cos, vy: this.uMag*this.sin };
+        this.acc = {ax: 0,ay: +10};   // downward direction --> y increases
     }
     
-    update(){
-        this.vel.add(this.acc);
-        this.pos.add(this.vel);
+    update(dt){
+        this.vel.vy += this.acc.ay*dt;
+        this.pos.x += this.vel.vx*dt;
+        this.pos.y += this.vel.vy*dt;
     }
 
     hits(player) {
@@ -39,65 +38,41 @@ class Arrow {
             this.landed = true;
         }
         if(
-            this.pos.x > player.pos.x - (player.size/2) &&
-            this.pos.x < player.pos.x + (player.size/2) &&
-
-            this.pos.y > player.pos.y - (player.size/2)&&
-            this.pos.y < player.pos.y + (player.size/2)
+            (this.pos.x > player.pos.x - (player.size/2)) && (this.pos.x < player.pos.x + (player.size/2))
+            && (this.pos.y > player.pos.y - (player.size/2)) && (this.pos.y < player.pos.y + (player.size/2))
         ){
             return true;
         }
         return false;
     }
-
-    render(){
-        if(this.landed){
-            ctx.fillStyle = 'red';
-            ctx.fillRect(this.pos.x-this.size/2, this.pos.y-this.size/2, this.size, this.size);
-
-        }
-        ctx.fillStyle = 'blue';
-        ctx.fillRect(this.pos.x-this.size/2, this.pos.y-this.size/2, this.size, this.size);
-    }
-}
-
-
-class Player{
-    constructor(color){
-        this.health = 100;
-        this.coords = {x:30, y:960};
-        this.size = 60;
-        this.color = color;
-    }
-
-    render(){
-        ctx.fillStyle = player.color;
-        ctx.fillRect(this.coords.x-this.size/2, this.coords.y-this.size/2, this.size, this.size);
-    }
 }
 
 io.on('connection', (socket)=>{
-    const spawnCoords = {x:50, y:800};
-    socket.emit('spawn',spawnCoords);
+    const player = {health:100,coords:{},size:60,color:'green'};
+    player.coords = {x:50, y:800};
+    players[socket.id] = player;
+
     socket.on('shoot', (coords)=>{
         const arrow = new Arrow(player,coords,floor);
-        arrows1.push(arrow);
+        arrows.push(arrow);
     })
-
+    let lastTime = Date.now();
+    let dt = 0;
+    setInterval(()=>{
+        dt = Date.now() - lastTime;
+        lastTime = Date.now();
+        update(dt);
+        socket.emit('render',players, arrows);        // all clients need this to see that player render
+    },1000/30);
 })
 
-arrows1 = arrows1.filter(arrow => (!arrow.hit && !arrow.landed));
-arrows2 = arrows2.filter(arrow => (!arrow.hit && !arrow.landed));
-for(const arrow of arrows1){
-    arrow.update();
-    arrow.render();
-}
-for(const arrow of arrows2){
-    arrow.update();
-    arrow.render();
+arrows = arrows.filter(arrow => (!arrow.hit && !arrow.landed));
+
+function update(dt){
+    for(const arrow of arrows){
+        arrow.update(dt);
+    }
 }
 
-
-const player1 = new Player('green');
-const player2 = new Player('blue');
-let currentPlayer = player1;
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`listening on ${PORT}`));
