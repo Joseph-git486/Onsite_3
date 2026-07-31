@@ -14,7 +14,7 @@ const players = {};
 
 class Arrow {
     constructor(player, coords,floor){    // coords = [{xi,yi},[xf,yf]]
-        this.uMag = (coords.length == 2)? ( (coords[0].x - coords[1].x)**2 + (coords[0].y - coords[1].y)**2):1;
+        this.uMag = (coords.length == 2)? Math.sqrt( (coords[0].xi - coords[1].xf)**2 + (coords[0].yi - coords[1].yf)**2):1;
         this.landed = false;
         this.hit = false;
         this.player = player;
@@ -22,7 +22,7 @@ class Arrow {
         this.cos = (coords[0].xi - coords[1].xf)/ Math.sqrt( (coords[0].xi-coords[1].xf)**2 + (coords[0].yi-coords[1].yf)**2 )
         this.size = 40;
 
-        this.pos = {x: player.x, y: player.y};
+        this.pos = {x: player.coords.x, y: player.coords.y};
         this.vel = {vx: this.uMag*this.cos, vy: this.uMag*this.sin };
         this.acc = {ax: 0,ay: +10};   // downward direction --> y increases
     }
@@ -38,12 +38,11 @@ class Arrow {
             this.landed = true;
         }
         if(
-            (this.pos.x > player.pos.x - (player.size/2)) && (this.pos.x < player.pos.x + (player.size/2))
-            && (this.pos.y > player.pos.y - (player.size/2)) && (this.pos.y < player.pos.y + (player.size/2))
+            (this.pos.x > player.coords.x - (player.size/2)) && (this.pos.x < player.coords.x + (player.size/2))
+            && (this.pos.y > player.coords.y - (player.size/2)) && (this.pos.y < player.coords.y + (player.size/2))
         ){
-            return true;
+            this.hit = true;
         }
-        return false;
     }
 }
 
@@ -56,20 +55,23 @@ io.on('connection', (socket)=>{
         const arrow = new Arrow(player,coords,floor);
         arrows.push(arrow);
     })
-    let lastTime = Date.now();
-    let dt = 0;
-    setInterval(()=>{
-        dt = Date.now() - lastTime;
-        lastTime = Date.now();
-        update(dt);
-        socket.emit('render',players, arrows);        // all clients need this to see that player render
-    },1000/30);
 })
 
-arrows = arrows.filter(arrow => (!arrow.hit && !arrow.landed));
+let lastTime = Date.now();
+let dt = 0;
+setInterval(()=>{
+    dt = (Date.now() - lastTime)/1000;
+    lastTime = Date.now();
+    update(dt);
+    io.emit('render',players, arrows);        // all clients need this to see that player render
+},1000/30);
 
 function update(dt){
+    arrows = arrows.filter(arrow => (!arrow.hit && !arrow.landed));
     for(const arrow of arrows){
+        for(const player of Object.values(players)){
+            arrow.hits(player);
+        }
         arrow.update(dt);
     }
 }
